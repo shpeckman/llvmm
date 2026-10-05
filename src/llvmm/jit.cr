@@ -1,6 +1,34 @@
 # src/llvmm/jit.cr
+
+# High-level facade over LLVM's ORCv2 JIT stack (`LLVMM::Orc::LLJIT`).
+#
+# Modules are built in the JIT's own `#context`, submitted with `#add_module`, and
+# resolved into callable Crystal procs with `#function`. Marked experimental because
+# the ORCv2 C API it wraps is marked experimental by LLVM.
+#
+# Construction initializes the native target (`LLVMM.init_native_target`) and creates
+# a target machine for the host CPU (default optimization level, PIC relocation,
+# GlobalISel disabled). The JIT owns the underlying `Orc::LLJIT` instance, its
+# thread-safe context, and every module passed to `#add_module`; `#dispose` releases
+# all of them and also runs on GC finalization. Prefer the block form of `.new` to
+# guarantee disposal:
+#
+# ```
+# LLVMM::JIT.new do |jit|
+#   mod = jit.new_module("example")
+#   add = mod.functions.add("add", [jit.context.int32, jit.context.int32], jit.context.int32)
+#   add.basic_blocks.append("entry") do |builder|
+#     builder.ret(builder.add(add.params[0], add.params[1]))
+#   end
+#   jit.add_module(mod)
+#
+#   jit.function("add", Int32, Int32, Int32).call(19, 23) # => 42
+# end
+# ```
 @[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
 class LLVMM::JIT
+  # The context in which modules for this JIT are built.
+  # Owned by the JIT and disposed together with it.
   getter context : LLVMM::Context
 
   def initialize
@@ -28,15 +56,22 @@ class LLVMM::JIT
     @jit = LLVMM::Orc::LLJIT.new(builder)
   end
 
+  # Creates a JIT and yields it, disposing it when the block returns.
   def self.new(&)
     jit = new
     yield jit ensure jit.dispose
   end
 
+  # Creates a new module in this JIT's `#context` with its target triple set to the
+  # host default. The caller owns the module until `#add_module` takes ownership of it.
   def new_module(name : String) : LLVMM::Module
     @context.new_module(name).tap { |mod| mod.target = LLVMM.default_target_triple }
   end
 
+  # Takes ownership of *mod* and adds it to the main JITDyLib for compilation.
+  # The module must have been built in this JIT's `#context` (see `#new_module`) and
+  # must not be disposed, modified, or added again afterwards. The signatures of the
+  # module's functions are recorded for the runtime checks performed by `#function`.
   def add_module(mod : LLVMM::Module) : Nil
     mod.functions.each do |func|
       fun_ty = func.function_type
@@ -47,14 +82,20 @@ class LLVMM::JIT
     @jit.add_llvm_ir_module(@jit.main_jit_dylib, tsm)
   end
 
+  # Lets JIT'd code resolve symbols against the current process by adding a dynamic
+  # library search generator for it to the main JITDyLib.
   def link_process_symbols : Nil
     @jit.main_jit_dylib.link_symbols_from_current_process(@jit.global_prefix)
   end
 
+  # Lets JIT'd code resolve symbols against the shared library at *path* by adding a
+  # dynamic library search generator for it to the main JITDyLib.
   def link_symbols_from_path(path : String) : Nil
     @jit.main_jit_dylib.link_symbols_from_path(path, @jit.global_prefix)
   end
 
+  # Defines *name* as an absolute symbol pointing at *address* in the main JITDyLib,
+  # e.g. to expose a Crystal `fun` to JIT'd code.
   def define(name : String, address : Void*) : Nil
     session = LibLLVMM.orc_lljit_get_execution_session(@jit)
     entry   = LibLLVMM.orc_execution_session_intern(session, name.check_no_null_byte)
@@ -65,6 +106,28 @@ class LLVMM::JIT
     LibC.free(pairs.as(Void*))
   end
 
+  # Looks up the JIT-compiled function *name* and returns it as a callable Crystal
+  # `Proc`.
+  #
+  # The last entry in *types* is the return type; the preceding ones are the argument
+  # types, so at least one type must be given (compile-time error otherwise). Before
+  # the lookup, the requested signature is checked at runtime against the functions
+  # recorded by `#add_module`: an unknown name, wrong arity, or a mismatched argument
+  # or return type raises. A symbol that resolves to a null address also raises.
+  #
+  # Crystal types map to LLVM types as follows:
+  #
+  # - `Bool` -> `i1`
+  # - `Int8`–`Int128` and `UInt8`–`UInt128` -> `i8`–`i128`
+  # - `Float32` / `Float64` -> `float` / `double`
+  # - `Pointer(T)` -> opaque pointer (`ptr`)
+  # - `StaticArray(T, N)` -> `[N x T]`, passed by value
+  # - `Struct` -> literal struct of its instance variables, passed by value
+  # - `Nil` -> `void` (valid as the return type only; a compile-time error elsewhere)
+  #
+  # Aggregate element and field types are mapped recursively and must themselves be
+  # mappable; any other type is a compile-time error. The returned proc is only valid
+  # until the JIT is disposed.
   def function(name : String, *types : *T) forall T
     {% if T.size == 0 %}
       {% raise "LLVMM::JIT#function requires at least a return type" %}
@@ -105,6 +168,9 @@ class LLVMM::JIT
        ).id }}
   end
 
+  # Disposes the underlying `Orc::LLJIT` instance and its thread-safe context.
+  # Idempotent. Invalidates `#context`, all added modules, and every proc returned
+  # by `#function`.
   def dispose : Nil
     return if @disposed
     @disposed = true

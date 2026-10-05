@@ -111,6 +111,7 @@ make spec-21        # run against a specific version (llvm-config-21)
 make matrix         # run against every installed supported LLVM version
 make matrix-strict  # same, but fail if any supported version is missing
 make api-diff       # diff bindings against the llvm-c headers of the newest llvmorg tag
+make docs           # generate API documentation into docs/
 ```
 
 CI runs the spec suite against LLVM 18, 19, 20, 21, 22, and 23 on every push and

@@ -345,6 +345,32 @@ describe "C API surface on every supported version" do
     end
   end
 
+  it "transfers buffer ownership to LLVM when parsing IR and bitcode" do
+    LLVMM.init_native_target
+
+    context  = LLVMM::Context.new
+    mod      = context.new_module("ownership")
+    int32_ty = context.int32
+    fn = mod.functions.add("add_one", [int32_ty], int32_ty)
+    fn.basic_blocks.append("entry") do |builder|
+      builder.ret(builder.add(fn.params[0], int32_ty.const_int(1)))
+    end
+
+    ir_buffer = LLVMM::MemoryBuffer.create_copy(mod.to_s.to_slice)
+    context.parse_ir(ir_buffer).functions["add_one"].name.should eq("add_one")
+    expect_raises(Exception, /Failed to take ownership/) do
+      context.parse_ir(ir_buffer)
+    end
+
+    bc_buffer = mod.write_bitcode_to_memory_buffer
+    LLVMM::Module.parse(bc_buffer, context).functions["add_one"].name.should eq("add_one")
+    expect_raises(Exception, /Failed to take ownership/) do
+      LLVMM::Module.parse(bc_buffer, context)
+    end
+
+    GC.collect
+  end
+
   it "round-trips GenericValue conversions" do
     context = LLVMM::Context.new
 

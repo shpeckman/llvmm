@@ -67,6 +67,9 @@
   end
 {% end %}
 
+# Raw FFI bindings to the LLVM C API. These are thin `fun` declarations with
+# no safety wrappers; prefer the high-level types under `LLVMM`. See the
+# upstream LLVM C API reference: https://llvm.org/doxygen/group__LLVMC.html
 lib LibLLVMM
   alias Char = LibC::Char
   alias Int = LibC::Int

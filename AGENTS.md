@@ -24,13 +24,19 @@ with a focus on JIT (ORCv2) compilation.
 - `make spec-N` — run against `llvm-config-N`
 - `make matrix` / `make matrix-strict` — run across every installed supported LLVM
 - `make api-diff` — diff bindings against the newest llvmorg tag
+- `make docs` — generate API documentation into `docs/` (`crystal docs`)
 - `LLVM_CONFIG=llvm-config-21 crystal spec` — override discovery manually
 
 ## Code standards
 
 - Compiler-friendly, performance-focused, idiomatic Crystal; data-driven design
-- No comments in code, except: every file starts with a comment containing its own
-  path (e.g. `# src/llvmm/jit.cr`, `<!-- README.md -->`)
+- No comments in code, except:
+  - every file starts with a comment containing its own path (e.g.
+    `# src/llvmm/jit.cr`, `<!-- README.md -->`)
+  - doc comments documenting the public API (consumed by `crystal docs`). Keep
+    them factual and concise; document behavior, contract, and ownership/memory
+    semantics where relevant. `lib LibLLVMM` FFI declarations only get a brief
+    pointer to the upstream LLVM C API documentation.
 - Never use `out` as an identifier (reserved keyword)
 - Never touch the `version` field in `shard.yml`
 - Prevent shotgun surgery: keep related changes in one place

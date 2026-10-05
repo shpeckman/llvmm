@@ -1,19 +1,45 @@
 # src/llvmm/disassembler.cr
+# Disassembles machine code into textual instructions for a target
+# (wraps LLVM's disassembler, `LLVMDisasmContextRef`).
+#
+# The target for the triple must have been initialized first (see
+# `LLVMM.init_native_target` / `LLVMM.init_all_targets`), otherwise
+# creation raises. Call `#dispose` when finished, or rely on the GC
+# finalizer; disposal is idempotent.
+#
+# ```
+# disasm = LLVMM::Disassembler.new(LLVMM.default_target_triple, cpu: LLVMM.host_cpu_name)
+# disasm.disassemble(Bytes[0xC3_u8]).each { |insn| puts insn.text }
+# ```
 class LLVMM::Disassembler
+  # Flags controlling the disassembly output; combine with `|`.
   @[Flags]
   enum Option : UInt64
-    UseMarkup         =  1
-    PrintImmHex       =  2
-    AsmPrinterVariant =  4
-    SetInstrComments  =  8
-    PrintLatency      = 16
-    Color             = 32
+    # Emit markup annotations in the output.
+    UseMarkup = 1
+    # Print immediate operands in hexadecimal.
+    PrintImmHex = 2
+    # Use the assembly-printer variant of the instruction printer.
+    AsmPrinterVariant = 4
+    # Print instruction comments.
+    SetInstrComments = 8
+    # Print instruction latencies alongside the disassembly.
+    PrintLatency = 16
+    # Colorize the output with ANSI escapes.
+    Color = 32
   end
 
+  # A single disassembled instruction: its byte *offset* and *size* within
+  # the input buffer, and its assembly *text*.
   record Instruction, offset : UInt64, size : UInt64, text : String
 
   getter triple : String
 
+  # Creates a disassembler for *triple*, optionally specialized for *cpu*
+  # and *features*. *features* is only used when *cpu* is also given.
+  #
+  # Raises if no disassembler can be created — typically because the
+  # target for *triple* has not been initialized or the triple is invalid.
   def initialize(@triple : String, cpu : String? = nil, features : String? = nil)
     @unwrap =
       if cpu && features
@@ -29,17 +55,31 @@ class LLVMM::Disassembler
     @finalized = false
   end
 
+  # Applies output *options* (see `Option`).
+  #
+  # Raises if LLVM rejects the flags, e.g. because the linked LLVM version
+  # does not support one of them.
   def options=(options : Option) : Option
     raise "Failed to set disassembler options #{options}" if LibLLVMM.set_disasm_options(self, options.value) == 0
     options
   end
 
+  # Disassembles *bytes* into an array of `Instruction`, treating *pc* as
+  # the address of the first byte.
+  #
+  # Stops at the first byte sequence LLVM cannot decode; any trailing
+  # undecodable bytes are silently skipped.
   def disassemble(bytes : Bytes, pc : UInt64 = 0) : Array(Instruction)
     instructions = [] of Instruction
     disassemble(bytes, pc) { |instruction| instructions << instruction }
     instructions
   end
 
+  # Yields each `Instruction` decoded from *bytes*, treating *pc* as the
+  # address of the first byte.
+  #
+  # Stops at the first byte sequence LLVM cannot decode; any trailing
+  # undecodable bytes are silently skipped.
   def disassemble(bytes : Bytes, pc : UInt64 = 0, & : Instruction ->) : Nil
     buffer = uninitialized UInt8[256]
     offset = 0_u64
@@ -51,6 +91,8 @@ class LLVMM::Disassembler
     end
   end
 
+  # Disposes the underlying disassembler; safe to call more than once.
+  # Also called by the GC finalizer.
   def dispose : Nil
     return if @finalized
     @finalized = true
