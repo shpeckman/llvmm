@@ -57,23 +57,18 @@ class LLVMM::MemoryBuffer
     )
   end
 
-  # Marks this wrapper as finalized so the GC finalizer leaves the
-  # underlying buffer alone.
-  #
-  # NOTE: this does not free the buffer itself; transfer ownership with
-  # `#take_ownership` to hand it to a consumer that frees it.
+  # Disposes the buffer unless its ownership was taken with
+  # `#take_ownership` (in that case the external consumer disposes it).
+  # Idempotent; also called by the GC finalizer.
   def dispose
-    return if @finalized
-    @finalized = true
     finalize
   end
 
-  # Disposes the buffer unless ownership was taken or the wrapper was
-  # already finalized. Called by the GC.
   def finalize
     return if @finalized
     return if @owned
 
+    @finalized = true
     LibLLVMM.dispose_memory_buffer(@unwrap)
   end
 

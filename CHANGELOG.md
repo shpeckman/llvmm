@@ -4,6 +4,24 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- API documentation: doc comments across the public API, generated with
+  `crystal docs` (`make docs`)
+- Regression specs for disposal and ownership-transfer behavior
+
+### Fixed
+
+- `JITCompiler#dispose` and `MemoryBuffer#dispose` never released the
+  underlying LLVM object due to a finalize-guard ordering bug
+- `Context#parse_ir` and `Module.parse` could double-dispose the
+  `MemoryBuffer` on GC finalization; buffer ownership is now transferred to
+  LLVM, and reusing a consumed buffer raises
+- `LLVMM.run_passes` / `LLVMM.run_passes_on_function` returned the raw error
+  ref instead of raising; they now raise with LLVM's error message on failure
+
 ## [0.2.0]
 
 ### Added

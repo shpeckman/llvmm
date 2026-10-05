@@ -16,8 +16,11 @@ class LLVMM::Module
   getter context : Context
 
   # Parses LLVM bitcode from *memory_buffer* in *context* and returns the
-  # resulting module. LLVM consumes the buffer.
+  # resulting module. LLVM consumes the buffer (ownership is transferred, as
+  # with `MemoryBuffer#take_ownership`), so this raises if the buffer was
+  # already consumed.
   def self.parse(memory_buffer : MemoryBuffer, context : Context) : self
+    memory_buffer.take_ownership { raise "Failed to take ownership of LLVMM::MemoryBuffer" }
     LibLLVMM.parse_bitcode_in_context2(context, memory_buffer, out module_ref)
     raise "BUG: failed to parse LLVMM bitcode from memory buffer" unless module_ref
     new(module_ref, context)

@@ -65,4 +65,42 @@ describe LLVMM do
       f.call(-5).should eq(-5)
     end
   end
+
+  it "disposes a JIT compiler explicitly and idempotently" do
+    LLVMM.init_native_target
+
+    context = LLVMM::Context.new
+    mod     = context.new_module("explicit_dispose")
+
+    func = mod.functions.add("f", [context.int32], context.int32)
+    func.basic_blocks.append("entry") do |builder|
+      builder.ret func.params[0]
+    end
+
+    jit = LLVMM::JITCompiler.new(mod)
+    jit.function_address("f").should_not eq(Pointer(Void).null)
+    jit.dispose
+    jit.dispose
+  end
+
+  it "raises on an invalid pass pipeline" do
+    LLVMM.init_native_target
+
+    context = LLVMM::Context.new
+    mod     = context.new_module("bad_passes")
+
+    func = mod.functions.add("f", [context.int32], context.int32)
+    func.basic_blocks.append("entry") do |builder|
+      builder.ret func.params[0]
+    end
+
+    triple  = LLVMM.default_target_triple
+    machine = LLVMM::Target.from_triple(triple).create_target_machine(triple, LLVMM.host_cpu_name)
+
+    LLVMM::PassBuilderOptions.new do |options|
+      expect_raises(Exception) do
+        LLVMM.run_passes(mod, "not-a-real-pass", machine, options)
+      end
+    end
+  end
 end

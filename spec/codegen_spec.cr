@@ -92,6 +92,34 @@ describe "codegen and object introspection" do
     LLVMM::MemoryBuffer.create_copy(bytes, "slice").to_slice.to_a.should eq([1, 2, 3, 4, 5])
   end
 
+  it "disposes a MemoryBuffer explicitly and idempotently" do
+    buffer = LLVMM::MemoryBuffer.create_copy(Bytes[1, 2, 3], "dispose")
+    buffer.to_slice.to_a.should eq([1, 2, 3])
+    buffer.dispose
+    buffer.dispose
+  end
+
+  it "leaves an owned MemoryBuffer to its consumer" do
+    LLVMM.init_native_target
+
+    context  = LLVMM::Context.new
+    mod      = context.new_module("owned_buffer")
+    int32_ty = context.int32
+    answer   = mod.functions.add("answer", [] of LLVMM::Type, int32_ty)
+    answer.basic_blocks.append("entry") { |builder| builder.ret(int32_ty.const_int(42)) }
+
+    buffer = host_machine.emit_obj_to_memory_buffer(mod)
+    object = LLVMM::ObjectFile.create(buffer)
+    buffer.dispose
+
+    symbols = [] of String
+    object.each_symbol { |symbol| symbols << symbol.name }
+    symbols.should contain("answer")
+
+    object.dispose
+    GC.collect
+  end
+
   it "JITs builder memory ops" do
     LLVMM::JIT.new do |jit|
       mod      = jit.new_module("memops")

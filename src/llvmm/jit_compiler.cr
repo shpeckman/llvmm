@@ -78,13 +78,12 @@ class LLVMM::JITCompiler
 
   # Disposes the execution engine and the module it owns. Idempotent.
   def dispose
-    return if @finalized
-    @finalized = true
     finalize
   end
 
   def finalize
     return if @finalized
+    @finalized = true
     LibLLVMM.dispose_execution_engine(@unwrap)
   end
 end

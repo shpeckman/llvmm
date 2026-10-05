@@ -255,8 +255,11 @@ class LLVMM::Context
 
   # Parses textual LLVM IR from *buf* and returns the resulting module, owned
   # by this context. Raises with LLVM's diagnostic on a parse error. LLVM
-  # consumes the buffer.
+  # consumes the buffer (ownership is transferred, as with
+  # `MemoryBuffer#take_ownership`), so this raises if the buffer was already
+  # consumed.
   def parse_ir(buf : MemoryBuffer)
+    buf.take_ownership { raise "Failed to take ownership of LLVMM::MemoryBuffer" }
     ret = LibLLVMM.parse_ir_in_context(self, buf, out mod, out msg)
     if ret != 0 && msg
       raise LLVMM.string_and_dispose(msg)

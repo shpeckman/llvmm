@@ -138,17 +138,18 @@ module LLVMM
   end
 
   # Runs a new-pass-manager pipeline described by *passes* (e.g.
-  # `"default<O2>"`) on *mod*. Returns the underlying
-  # `LibLLVMM::ErrorRef`, which is null on success.
+  # `"default<O2>"`) on *mod*. Raises with the error message if the pipeline
+  # cannot be parsed or run.
   def self.run_passes(mod : Module, passes : String, target_machine : TargetMachine, options : PassBuilderOptions)
-    LibLLVMM.run_passes(mod, passes, target_machine, options)
+    assert LibLLVMM.run_passes(mod, passes, target_machine, options)
   end
 
   {% unless LibLLVMM::IS_LT_200 %}
     # Runs a new-pass-manager pipeline described by *passes* on a single
-    # function. Requires LLVM 20+ (gated on `IS_LT_200`).
+    # function. Requires LLVM 20+ (gated on `IS_LT_200`). Raises with the
+    # error message if the pipeline cannot be parsed or run.
     def self.run_passes_on_function(func : Function, passes : String, target_machine : TargetMachine, options : PassBuilderOptions)
-      LibLLVMM.run_passes_on_function(func, passes, target_machine, options)
+      assert LibLLVMM.run_passes_on_function(func, passes, target_machine, options)
     end
   {% end %}
 
