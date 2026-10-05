@@ -1,4 +1,10 @@
 # src/llvmm/orc/lljit_builder.cr
+# Wraps LLVM's ORCv2 `LLVMOrcLLJITBuilder`, used to configure an `LLJIT`
+# before construction.
+#
+# Ownership transfers to the `LLJIT` built from it: after `LLJIT.new(builder)`
+# the builder is consumed and must not be used or disposed. If no `LLJIT` is
+# ever built, the builder is disposed on `finalize` or via `#dispose`.
 @[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
 class LLVMM::Orc::LLJITBuilder
   protected def initialize(@unwrap : LibLLVMM::OrcLLJITBuilderRef)
@@ -7,6 +13,7 @@ class LLVMM::Orc::LLJITBuilder
     @object_linking_layer_creator_box = Pointer(Void).null
   end
 
+  # Creates a builder with default configuration.
   def self.new
     new(LibLLVMM.orc_create_lljit_builder)
   end
@@ -15,6 +22,10 @@ class LLVMM::Orc::LLJITBuilder
     @unwrap
   end
 
+  # Sets a custom creator for the object linking layer. The block receives the
+  # `ExecutionSession` and target triple, and must return a raw
+  # `LibLLVMM::OrcObjectLayerRef` that the built JIT adopts. The block is kept
+  # alive by this builder for as long as the resulting `LLJIT` may call it.
   def set_object_linking_layer_creator(&creator : ExecutionSession, String -> LibLLVMM::OrcObjectLayerRef) : Nil
     @object_linking_layer_creator     = creator
     @object_linking_layer_creator_box = Box.box(creator)
@@ -23,6 +34,8 @@ class LLVMM::Orc::LLJITBuilder
     }, @object_linking_layer_creator_box)
   end
 
+  # Disposes the builder without building an `LLJIT`. Also runs on `finalize`
+  # unless ownership was transferred to an `LLJIT`.
   def dispose : Nil
     LibLLVMM.orc_dispose_lljit_builder(self)
     @unwrap = LibLLVMM::OrcLLJITBuilderRef.null
@@ -34,6 +47,9 @@ class LLVMM::Orc::LLJITBuilder
     end
   end
 
+  # Internal ownership hand-off: disarms this builder's finalizer on the first
+  # call. Yields if ownership was already taken, i.e. the builder is being
+  # consumed twice.
   def take_ownership(&) : Nil
     if @dispose_on_finalize
       @dispose_on_finalize = false

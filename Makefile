@@ -4,7 +4,7 @@ CRYSTAL ?= crystal
 VERSIONS := $(shell cut -d. -f1 src/llvmm/ext/llvm-versions.txt | sort -un)
 
 .DEFAULT_GOAL := help
-.PHONY: help spec matrix matrix-strict api-diff
+.PHONY: help spec matrix matrix-strict api-diff docs
 
 help:           ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36mmake %-18s\033[0m \033[2;37m%s\033[0m\n", $$1, $$2}'
@@ -45,3 +45,6 @@ matrix-strict:  ## Like matrix, but fail if any supported LLVM is missing
 
 api-diff:       ## Diff bindings against llvm-c headers of TAG (default: latest release)
 	$(CRYSTAL) run scripts/api_diff.cr $(if $(TAG),-- $(TAG))
+
+docs:           ## Generate API documentation into docs/
+	$(CRYSTAL) docs

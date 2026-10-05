@@ -1,5 +1,17 @@
 # src/llvmm/enums.cr
 module LLVMM
+  # LLVM attribute kinds for functions, return values and parameters,
+  # combinable as a flag set.
+  #
+  # Members are mapped to LLVM's runtime attribute kind ids lazily on first
+  # use. A few attributes (see `requires_type?`) also carry a `Type`.
+  #
+  # ```
+  # call.add_instruction_attribute(
+  #   LLVMM::AttributeIndex::FunctionIndex.value,
+  #   LLVMM::Attribute::NoUnwind,
+  #   context)
+  # ```
   @[Flags]
   enum Attribute : UInt64
     Alignment
@@ -74,6 +86,7 @@ module LLVMM
       @@typed_attrs ||= load_llvm_typed_attributes
     end
 
+    # Yields the LLVM attribute kind id of each member in this set.
     def each_kind(& : UInt32 ->)
       kind_ids = Attribute.kind_ids
       each do |member|
@@ -157,27 +170,34 @@ module LLVMM
       typed_attrs
     end
 
+    # The LLVM attribute kind id for *member*.
     def self.kind_for(member)
       kind_ids[member]
     end
 
+    # The member for LLVM attribute kind id *kind*.
+    #
+    # Raises if *kind* does not correspond to a known member.
     def self.from_kind(kind)
       kind_ids.key_for(kind)
     end
 
+    # Whether the attribute with LLVM kind id *kind* requires a `Type`
+    # argument (currently `ByVal`, `StructRet` and `InAlloca`).
     def self.requires_type?(kind)
       member = from_kind(kind)
       typed_attrs.includes?(member)
     end
   end
 
-  # Attribute index are either ReturnIndex (0), FunctionIndex (-1) or a
-  # parameter number ranging from 1 to N.
+  # Well-known attribute indices: `ReturnIndex` (0) and `FunctionIndex`
+  # (~0). Parameter attributes use indices 1..N.
   enum AttributeIndex : UInt32
     ReturnIndex   = 0_u32
     FunctionIndex = ~0_u32
   end
 
+  # Linkage types for global values (functions, global variables, aliases).
   enum Linkage
     External
     AvailableExternally
@@ -198,6 +218,7 @@ module LLVMM
     LinkerPrivateWeak
   end
 
+  # DLL storage class for global values on Windows targets.
   enum DLLStorageClass
     Default
 
@@ -208,18 +229,22 @@ module LLVMM
     DLLExport
   end
 
+  # Symbol visibility styles for global values.
   enum Visibility
     Default
     Hidden
     Protected
   end
 
+  # Whether the address of a global value is significant
+  # (`unnamed_addr`/`local_unnamed_addr`).
   enum UnnamedAddress
     None
     Local
     Global
   end
 
+  # Thread-local storage models for thread-local globals.
   enum ThreadLocalMode
     NotThreadLocal
     GeneralDynamicTLS
@@ -228,6 +253,8 @@ module LLVMM
     LocalExecTLS
   end
 
+  # Integer comparison predicates for `icmp` (values match LLVM's
+  # `LLVMIntPredicate`).
   enum IntPredicate
     EQ  = 32
     NE
@@ -241,6 +268,8 @@ module LLVMM
     SLE
   end
 
+  # Floating-point comparison predicates for `fcmp` (values match LLVM's
+  # `LLVMRealPredicate`).
   enum RealPredicate
     PredicateFalse
     OEQ
@@ -260,6 +289,10 @@ module LLVMM
     PredicateTrue
   end
 
+  # LLVM instruction opcodes (values match LLVM's `LLVMOpcode`).
+  #
+  # Some members are version-gated: `Br` exists only before LLVM 23, while
+  # `UncondBr`/`CondBr` require LLVM 23+; `PtrToAddr` requires LLVM 22+.
   enum Opcode
     Ret = 1
     {% if LibLLVMM::IS_LT_230 %}
@@ -339,6 +372,9 @@ module LLVMM
   end
 
   struct Type
+    # Discriminator for `LLVMM::Type`, returned by `Type#kind`.
+    #
+    # `Byte` requires LLVM 23+.
     enum Kind
       Void
       Half
@@ -367,6 +403,7 @@ module LLVMM
     end
   end
 
+  # Code generation optimization levels for target machines.
   enum CodeGenOptLevel
     None
     Less
@@ -374,11 +411,13 @@ module LLVMM
     Aggressive
   end
 
+  # Output kind of target machine emission (assembly text or object file).
   enum CodeGenFileType
     AssemblyFile
     ObjectFile
   end
 
+  # Relocation models for code generation.
   enum RelocMode
     Default
     Static
@@ -386,6 +425,7 @@ module LLVMM
     DynamicNoPIC
   end
 
+  # Code models for code generation and JIT.
   enum CodeModel
     Default
     JITDefault
@@ -396,12 +436,14 @@ module LLVMM
     Large
   end
 
+  # Action taken by the module verifier when verification fails.
   enum VerifierFailureAction
     AbortProcessAction # verifier will print to stderr and abort()
     PrintMessageAction # verifier will print to stderr and return 1
     ReturnStatusAction # verifier will just return 1
   end
 
+  # Calling conventions (values match LLVM's `LLVMCallConv`).
   enum CallConvention
     C            =  0
     Fast         =  8
@@ -412,10 +454,12 @@ module LLVMM
     X86_FastCall = 65
   end
 
+  # DWARF tags used by `DIBuilder`.
   enum DwarfTag
     AutoVariable = 0x100
   end
 
+  # DWARF type encodings used by `DIBuilder`.
   enum DwarfTypeEncoding
     Address        = 0x01
     Boolean        = 0x02
@@ -437,6 +481,7 @@ module LLVMM
     HiUser         = 0xff
   end
 
+  # DWARF source language constants used by `DIBuilder`.
   enum DwarfSourceLanguage
     C89
     C
@@ -502,6 +547,8 @@ module LLVMM
     BORLAND_Delphi
   end
 
+  # Debug info flags attached to DI nodes (values match LLVM's
+  # `LLVMDIFlags`).
   enum DIFlags : UInt32
     Zero       = 0
     Private    = 1
@@ -541,12 +588,16 @@ module LLVMM
     LittleEndian = 1 << 28
   end
 
+  # Inline assembly dialects for `Type#inline_asm`.
   enum InlineAsmDialect
     ATT
     Intel
   end
 
   struct Value
+    # Discriminator for `LLVMM::Value`, returned by `ValueMethods#kind`.
+    #
+    # `ConstantByte` requires LLVM 23+; `ConstantPtrAuth` requires LLVM 19+.
     enum Kind
       Argument
       BasicBlock
@@ -589,6 +640,9 @@ module LLVMM
   end
 
   struct Metadata
+    # Well-known metadata kind ids (e.g. `dbg`, `tbaa`), usable wherever a
+    # metadata kind id is expected (`ValueMethods#metadata`,
+    # `ValueMethods#set_metadata`, ...).
     enum Type : UInt32
       Dbg                   =  0 # "dbg"
       Tbaa                  =  1 # "tbaa"
@@ -621,6 +675,7 @@ module LLVMM
     end
   end
 
+  # Unwind table kinds for the `uwtable` function attribute.
   enum UWTableKind
     None    = 0 # No unwind table requested
     Sync    = 1 # "Synchronous" unwind tables
@@ -628,6 +683,8 @@ module LLVMM
     Default = 2
   end
 
+  # No-wrap flags for getelementptr, combining `inbounds`, `nusw` and
+  # `nuw`.
   @[Flags]
   enum GEPNoWrapFlags : UInt32
     InBounds = 1 << 0
@@ -635,6 +692,7 @@ module LLVMM
     NUW      = 1 << 2
   end
 
+  # Tail call kinds for call instructions.
   enum TailCallKind
     None     = 0
     Tail     = 1
@@ -642,6 +700,7 @@ module LLVMM
     NoTail   = 3
   end
 
+  # Fast-math flags for floating-point instructions.
   @[Flags]
   enum FastMathFlags : UInt32
     AllowReassoc    = 1 << 0
@@ -653,18 +712,21 @@ module LLVMM
     ApproxFunc      = 1 << 6
   end
 
+  # Kinds of debug records (new debug info format).
   enum DbgRecordKind
     Declare = 0
     Value   = 1
     Assign  = 2
   end
 
+  # Checksum algorithms for debug info file checksums.
   enum ChecksumKind
     MD5    = 0
     SHA1   = 1
     SHA256 = 2
   end
 
+  # DWARF macinfo record types.
   enum DWARFMacinfoRecordType
     Define    = 0x01
     Macro     = 0x02
@@ -673,6 +735,9 @@ module LLVMM
     VendorExt = 0xff
   end
 
+  # Metadata node subclass ids (values match LLVM's `LLVMMetadataKind`).
+  #
+  # `DISubrangeType` and `DIFixedPointType` require LLVM 21+.
   enum MetadataKind : UInt32
     MDString
     ConstantAsMetadata
@@ -716,6 +781,7 @@ module LLVMM
     {% end %}
   end
 
+  # Denormal floating-point handling modes.
   enum DenormalModeKind
     IEEE         = 0
     PreserveSign = 1
@@ -723,6 +789,7 @@ module LLVMM
     Dynamic      = 3
   end
 
+  # Severity levels of LLVM diagnostics.
   enum DiagnosticSeverity
     Error
     Warning
@@ -730,6 +797,7 @@ module LLVMM
     Note
   end
 
+  # GlobalISel fallback behavior of a target machine.
   enum GlobalISelAbortMode
     Enable
     Disable
