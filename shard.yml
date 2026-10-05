@@ -1,6 +1,9 @@
 # shard.yml
 name: llvmm
 version: 0.2.0
+description: LLVM bindings for Crystal with first-class JIT (ORCv2) support
+
+repository: https://github.com/shpeckman/llvmm
 
 authors:
   - shpeckman <geelenrobin@proton.me>
