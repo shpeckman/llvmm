@@ -34,6 +34,9 @@ lib LibLLVMM
     "Xtensa",
   ]
 
+  # Subset of ALL_TARGETS without an assembly parser, per llvm/Config/AsmParsers.def
+  NO_ASM_PARSER_TARGETS = ["ARC", "DirectX", "NVPTX", "SPIRV", "XCore"]
+
   # Subset of ALL_TARGETS that ship a disassembler, per llvm/Config/Disassemblers.def
   DISASSEMBLER_TARGETS = [
     "AArch64",

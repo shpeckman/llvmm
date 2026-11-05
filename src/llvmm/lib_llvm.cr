@@ -13,7 +13,7 @@
 
     @[Link("llvm")]
     {% if compare_versions(Crystal::VERSION, "1.11.0-dev") >= 0 %}
-      @[Link(dll: "LLVMM-C.dll")]
+      @[Link(dll: "LLVM-C.dll")]
     {% end %}
     lib LibLLVMM
     end
@@ -30,7 +30,7 @@
     {% end %}
   {% end %}
 
-  {% llvm_version ||= Crystal::DESCRIPTION.gsub(/.*LLVMM: ([^\n]*).*/m, "\\1") %}
+  {% llvm_version ||= Crystal::DESCRIPTION.gsub(/.*LLVM: ([^\n]*).*/m, "\\1") %}
 
   {% unless llvm_targets %}
     {% if flag?(:i386) || flag?(:x86_64) %}

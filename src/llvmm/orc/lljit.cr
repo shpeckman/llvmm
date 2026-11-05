@@ -15,7 +15,7 @@
 # address = lljit.lookup("my_function")
 # lljit.dispose
 # ```
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::LLJIT
   protected def initialize(@unwrap : LibLLVMM::OrcLLJITRef)
   end

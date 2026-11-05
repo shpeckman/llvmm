@@ -13,6 +13,10 @@ describe LLVMM do
     LLVMM.normalize_triple("x86_64-unknown-linux-gnu").should eq("x86_64-unknown-linux-gnu")
   end
 
+  it "initializes every built target" do
+    LLVMM.init_all_targets
+  end
+
   it "builds, JIT-compiles and runs a function" do
     LLVMM.init_native_target
 

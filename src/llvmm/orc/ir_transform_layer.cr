@@ -4,7 +4,7 @@
 #
 # Instances are borrowed from `LLJIT#ir_transform_layer`; they are not disposed
 # independently and stay valid until the owning `LLJIT` is disposed.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::IRTransformLayer
   protected def initialize(@unwrap : LibLLVMM::OrcIRTransformLayerRef)
     @transform     = nil

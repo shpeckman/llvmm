@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Target initialization no longer references assembly parsers absent on ARC,
+  DirectX, NVPTX, SPIRV, and XCore
+- Restored upstream LLVM names in Windows linking, version detection, discovery
+  errors, and experimental API annotations
+- LLVM discovery now prefers a supported unversioned `llvm-config`, then probes
+  versioned executables newest-first instead of oldest-first
 - `JITCompiler#dispose` and `MemoryBuffer#dispose` never released the
   underlying LLVM object due to a finalize-guard ordering bug
 - `Context#parse_ir` and `Module.parse` could double-dispose the

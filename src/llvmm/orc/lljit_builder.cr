@@ -5,7 +5,7 @@
 # Ownership transfers to the `LLJIT` built from it: after `LLJIT.new(builder)`
 # the builder is consumed and must not be used or disposed. If no `LLJIT` is
 # ever built, the builder is disposed on `finalize` or via `#dispose`.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::LLJITBuilder
   protected def initialize(@unwrap : LibLLVMM::OrcLLJITBuilderRef)
     @dispose_on_finalize              = true

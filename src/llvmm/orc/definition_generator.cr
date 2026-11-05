@@ -5,7 +5,7 @@
 # No finalizer is installed. Call `#dispose` explicitly, unless the generator
 # was added to a `JITDylib` via `JITDylib#add_generator`, which takes ownership —
 # disposing it afterwards is an error.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::DefinitionGenerator
   protected def initialize(@unwrap : LibLLVMM::OrcDefinitionGeneratorRef)
   end

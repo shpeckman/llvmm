@@ -2,20 +2,29 @@
 # src/llvmm/ext/find-llvm-config.sh
 
 if ! LLVM_CONFIG=$(command -v "$LLVM_CONFIG"); then
+  versions=$(cat "$(dirname "$0")/llvm-versions.txt")
   llvm_config_version=$(llvm-config --version 2>/dev/null)
-  # shellcheck disable=SC2013
-  for version in $(cat "$(dirname "$0")/llvm-versions.txt"); do
-    LLVM_CONFIG=$(
-      ([ "${llvm_config_version#"$version"}" != "$llvm_config_version" ] && command -v llvm-config) ||
-        command -v llvm-config-"${version%.*}" ||
-        command -v llvm-config-"$version" ||
-        command -v "llvm-config${version%.*}${version#*.}" ||
-        command -v llvm-config"${version%.*}" ||
-        command -v llvm-config"$version" ||
-        command -v llvm"${version%.*}"-config
-    )
-    [ "$LLVM_CONFIG" ] && break
+
+  for version in $versions; do
+    if [ "${llvm_config_version#"$version"}" != "$llvm_config_version" ]; then
+      LLVM_CONFIG=$(command -v llvm-config)
+      break
+    fi
   done
+
+  if [ ! "$LLVM_CONFIG" ]; then
+    for version in $versions; do
+      LLVM_CONFIG=$(
+        command -v llvm-config-"${version%.*}" ||
+          command -v llvm-config-"$version" ||
+          command -v "llvm-config${version%.*}${version#*.}" ||
+          command -v llvm-config"${version%.*}" ||
+          command -v llvm-config"$version" ||
+          command -v llvm"${version%.*}"-config
+      )
+      [ "$LLVM_CONFIG" ] && break
+    done
+  fi
 fi
 
 if [ "$LLVM_CONFIG" ]; then
@@ -29,6 +38,6 @@ if [ "$LLVM_CONFIG" ]; then
   esac
 else
   printf "Error: Could not find location of llvm-config. Please specify path in environment variable LLVM_CONFIG.\n" >&2
-  printf "Supported LLVMM versions: %s\n" "$(sed 's/\.0//g' "$(dirname "$0")/llvm-versions.txt")" >&2
+  printf "Supported LLVM versions: %s\n" "$(sed 's/\.0//g' "$(dirname "$0")/llvm-versions.txt")" >&2
   exit 1
 fi

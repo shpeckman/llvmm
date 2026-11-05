@@ -7,7 +7,7 @@
 # caller and must be disposed with `release` once no longer needed. The
 # tracker returned by `JITDylib#default_resource_tracker` is borrowed from the
 # dylib — calling `release` on it raises.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ResourceTracker
   protected def initialize(@unwrap : LibLLVMM::OrcResourceTrackerRef, @owned = true)
   end

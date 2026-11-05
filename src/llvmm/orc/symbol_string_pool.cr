@@ -4,7 +4,7 @@
 #
 # The pool is owned by its session; instances are obtained from
 # `ExecutionSession#symbol_string_pool` and must not be disposed directly.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::SymbolStringPool
   protected def initialize(@unwrap : LibLLVMM::OrcSymbolStringPoolRef)
   end
@@ -26,7 +26,7 @@ end
 # Entries are not garbage collected: each `ExecutionSession#intern` or
 # `LLJIT#mangle_and_intern` call hands the caller one reference, which must be
 # balanced with `release` (use `retain` to take an additional reference).
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::SymbolStringPoolEntry
   protected def initialize(@unwrap : LibLLVMM::OrcSymbolStringPoolEntryRef)
   end

@@ -8,7 +8,7 @@
 # ORC takes ownership when the module is added to a JIT, e.g. via
 # `LLJIT#add_llvm_ir_module`, so no manual disposal is needed in the usual
 # flow.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ThreadSafeModule
   protected def initialize(@unwrap : LibLLVMM::OrcThreadSafeModuleRef, @dispose_on_finalize = true)
   end

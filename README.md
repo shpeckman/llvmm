@@ -34,9 +34,10 @@ shards install
 
 ### LLVM discovery
 
-At compile time llvmm locates `llvm-config` via `src/llvmm/ext/find-llvm-config.sh`,
-which probes the versions listed in `src/llvmm/ext/llvm-versions.txt`. To override
-discovery, set `LLVM_CONFIG`:
+At compile time llvmm locates `llvm-config` via `src/llvmm/ext/find-llvm-config.sh`.
+Unless `LLVM_CONFIG` is set, the script prefers an unversioned `llvm-config` with a
+supported version, then probes versioned executables newest-first using
+`src/llvmm/ext/llvm-versions.txt`. To select a specific toolchain, set `LLVM_CONFIG`:
 
 ```sh
 LLVM_CONFIG=llvm-config-21 crystal build my_app.cr

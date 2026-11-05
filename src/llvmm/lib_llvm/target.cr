@@ -10,7 +10,9 @@ lib LibLLVMM
     fun initialize_{{name}}_target = LLVMInitialize{{target.id}}Target
     fun initialize_{{name}}_target_mc = LLVMInitialize{{target.id}}TargetMC
     fun initialize_{{name}}_asm_printer = LLVMInitialize{{target.id}}AsmPrinter
-    fun initialize_{{name}}_asm_parser = LLVMInitialize{{target.id}}AsmParser
+    {% unless NO_ASM_PARSER_TARGETS.includes?(target) %}
+      fun initialize_{{name}}_asm_parser = LLVMInitialize{{target.id}}AsmParser
+    {% end %}
     {% if DISASSEMBLER_TARGETS.includes?(target) %}
       fun initialize_{{name}}_disassembler = LLVMInitialize{{target.id}}Disassembler
     {% end %}

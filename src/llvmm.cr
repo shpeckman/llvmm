@@ -18,9 +18,9 @@ module LLVMM
     @@initialized_{{name}} = Atomic(Bool).new(false)
 
     # Initializes this target: target info, target, MC layer, asm printer and
-    # parser, the disassembler (where available), and links in the MCJIT.
-    # Idempotent and thread-safe. Raises if the linked LLVM was built without
-    # this target.
+    # parser (where available), the disassembler (where available), and links
+    # in the MCJIT. Idempotent and thread-safe. Raises if the linked LLVM was
+    # built without this target.
     def self.init_{{name}} : Nil
       return if @@initialized_{{name}}.swap(true)
 
@@ -29,7 +29,9 @@ module LLVMM
         LibLLVMM.initialize_{{name}}_target
         LibLLVMM.initialize_{{name}}_target_mc
         LibLLVMM.initialize_{{name}}_asm_printer
-        LibLLVMM.initialize_{{name}}_asm_parser
+        \{% unless LibLLVMM::NO_ASM_PARSER_TARGETS.includes?({{target}}) %}
+          LibLLVMM.initialize_{{name}}_asm_parser
+        \{% end %}
         \{% if LibLLVMM::DISASSEMBLER_TARGETS.includes?({{target}}) %}
           LibLLVMM.initialize_{{name}}_disassembler
         \{% end %}

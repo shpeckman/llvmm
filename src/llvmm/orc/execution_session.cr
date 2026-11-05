@@ -5,7 +5,7 @@
 # Instances are obtained from `LLJIT#execution_session`. The underlying session
 # is owned by the JIT and is disposed together with it; this wrapper never
 # takes ownership.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ExecutionSession
   protected def initialize(@unwrap : LibLLVMM::OrcExecutionSessionRef)
     @error_reporter     = nil

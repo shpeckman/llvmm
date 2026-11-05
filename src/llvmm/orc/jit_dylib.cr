@@ -6,7 +6,7 @@
 # Dylibs are owned by their session. Instances are obtained from
 # `LLJIT#main_jit_dylib`, `ExecutionSession#[]` or
 # `ExecutionSession#create_jit_dylib`; this wrapper never takes ownership.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::JITDylib
   protected def initialize(@unwrap : LibLLVMM::OrcJITDylibRef)
     @symbol_filter     = nil

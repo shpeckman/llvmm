@@ -25,7 +25,7 @@
 #   jit.function("add", Int32, Int32, Int32).call(19, 23) # => 42
 # end
 # ```
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::JIT
   # The context in which modules for this JIT are built.
   # Owned by the JIT and disposed together with it.

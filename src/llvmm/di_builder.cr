@@ -1,7 +1,7 @@
 # src/llvmm/di_builder.cr
 require "./lib_llvm"
 
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 # Builds DWARF debug-info metadata for an `LLVMM::Module` (wraps
 # `LLVMDIBuilder`).
 #

@@ -13,7 +13,7 @@
 # tsm = LLVMM::Orc::ThreadSafeModule.new(mod, ts_ctx)
 # lljit.add_llvm_ir_module(lljit.main_jit_dylib, tsm)
 # ```
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ThreadSafeContext
   protected def initialize(@unwrap : LibLLVMM::OrcThreadSafeContextRef)
   end

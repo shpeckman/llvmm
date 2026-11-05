@@ -5,7 +5,7 @@
 # Instances are borrowed from `LLJIT#obj_linking_layer`; they are not disposed
 # independently and stay valid until the owning `LLJIT` is disposed. Objects
 # added directly through this layer bypass the `ObjectTransformLayer`.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ObjectLayer
   protected def initialize(@unwrap : LibLLVMM::OrcObjectLayerRef)
   end

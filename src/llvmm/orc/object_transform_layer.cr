@@ -5,7 +5,7 @@
 # Instances are borrowed from `LLJIT#obj_transform_layer`; they are not disposed
 # independently and stay valid until the owning `LLJIT` is disposed. Only
 # objects added via `LLJIT#add_object_file` pass through this layer.
-@[Experimental("The C API wrapped by this type is marked as experimental by LLVMM.")]
+@[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::ObjectTransformLayer
   protected def initialize(@unwrap : LibLLVMM::OrcObjectTransformLayerRef)
     @transform_box = Pointer(Void).null
