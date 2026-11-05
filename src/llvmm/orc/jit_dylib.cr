@@ -9,7 +9,7 @@
 @[Experimental("The C API wrapped by this type is marked as experimental by LLVM.")]
 class LLVMM::Orc::JITDylib
   protected def initialize(@unwrap : LibLLVMM::OrcJITDylibRef)
-    @symbol_filter     = nil
+    @symbol_filter = nil
     @symbol_filter_box = Pointer(Void).null
   end
 
@@ -57,7 +57,7 @@ class LLVMM::Orc::JITDylib
   # The filter is kept alive by this wrapper; it must not capture state that
   # becomes invalid before the JIT is disposed.
   def link_symbols_from_current_process(global_prefix : Char, &filter : String -> Bool) : Nil
-    @symbol_filter     = filter
+    @symbol_filter = filter
     @symbol_filter_box = Box.box(filter)
     LLVMM.assert LibLLVMM.orc_create_dynamic_library_search_generator_for_process(out dg, global_prefix.ord.to_u8, ->(ctx : Void*, sym : LibLLVMM::OrcSymbolStringPoolEntryRef) {
       name = String.new(LibLLVMM.orc_symbol_string_pool_entry_str(sym))
@@ -78,7 +78,7 @@ class LLVMM::Orc::JITDylib
   # pulling members through *obj_layer* on demand. Raises `LLVMM::Error` if the
   # archive cannot be loaded.
   #
-  # Only available with LLVMM 21 and above: the LLVMM 18-20 headers declare this
+  # Only available with LLVM 21 and above: the LLVM 19-20 headers declare this
   # function but the C symbol was never actually exported (upstream header/impl mismatch).
   # On those versions this method raises `NotImplementedError`.
   def link_symbols_from_static_library(path : String, obj_layer : ObjectLayer) : Nil

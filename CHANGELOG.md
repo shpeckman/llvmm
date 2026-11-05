@@ -8,9 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Higher-level JIT module/function builder, optional pass pipelines, textual IR
+  submission, and typed non-capturing `Proc` symbol definitions
 - API documentation: doc comments across the public API, generated with
   `crystal docs` (`make docs`)
 - Regression specs for disposal and ownership-transfer behavior
+
+### Changed
+
+- Minimum supported LLVM version is now 19; LLVM 18 is no longer tested or discovered
 
 ### Fixed
 

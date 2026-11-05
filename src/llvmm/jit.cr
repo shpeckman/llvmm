@@ -2,25 +2,26 @@
 
 # High-level facade over LLVM's ORCv2 JIT stack (`LLVMM::Orc::LLJIT`).
 #
-# Modules are built in the JIT's own `#context`, submitted with `#add_module`, and
-# resolved into callable Crystal procs with `#function`. Marked experimental because
-# the ORCv2 C API it wraps is marked experimental by LLVM.
+# Modules are built with `#module` in the JIT's own `#context`, submitted with
+# `#add_module`, or parsed with `#add_ir`. Compiled functions resolve into callable
+# Crystal procs with `#function`. Marked experimental because the ORCv2 C API it
+# wraps is marked experimental by LLVM.
 #
 # Construction initializes the native target (`LLVMM.init_native_target`) and creates
 # a target machine for the host CPU (default optimization level, PIC relocation,
-# GlobalISel disabled). The JIT owns the underlying `Orc::LLJIT` instance, its
-# thread-safe context, and every module passed to `#add_module`; `#dispose` releases
+# GlobalISel disabled). The optional *passes* argument runs a new-pass-manager
+# pipeline on every submitted module. The JIT owns the underlying `Orc::LLJIT`
+# instance, its thread-safe context, and every submitted module; `#dispose` releases
 # all of them and also runs on GC finalization. Prefer the block form of `.new` to
 # guarantee disposal:
 #
 # ```
-# LLVMM::JIT.new do |jit|
-#   mod = jit.new_module("example")
-#   add = mod.functions.add("add", [jit.context.int32, jit.context.int32], jit.context.int32)
-#   add.basic_blocks.append("entry") do |builder|
-#     builder.ret(builder.add(add.params[0], add.params[1]))
+# LLVMM::JIT.new(passes: "default<O2>") do |jit|
+#   jit.module("example") do |mod|
+#     mod.function("add", Int32, Int32, Int32) do |func, builder|
+#       builder.ret(builder.add(func.params[0], func.params[1]))
+#     end
 #   end
-#   jit.add_module(mod)
 #
 #   jit.function("add", Int32, Int32, Int32).call(19, 23) # => 42
 # end
@@ -31,7 +32,9 @@ class LLVMM::JIT
   # Owned by the JIT and disposed together with it.
   getter context : LLVMM::Context
 
-  def initialize
+  @target_machine : LLVMM::TargetMachine?
+
+  def initialize(*, @passes : String? = nil)
     LLVMM.init_native_target
     @ts_ctx = uninitialized LLVMM::Orc::ThreadSafeContext
     @context = uninitialized LLVMM::Context
@@ -44,21 +47,23 @@ class LLVMM::JIT
     {% end %}
     @arg_types = {} of String => Array(String)
     @ret_types = {} of String => String
-    @disposed  = false
-    triple     = LLVMM.default_target_triple
+    @disposed = false
+    @target_machine = nil
+    triple = LLVMM.default_target_triple
     machine = LibLLVMM.create_target_machine(LLVMM::Target.from_triple(triple), triple, LLVMM.host_cpu_name, "",
       LLVMM::CodeGenOptLevel::Default, LLVMM::RelocMode::PIC, LLVMM::CodeModel::Default)
     raise "Couldn't create target machine for #{triple}" if machine.null?
     LibLLVMM.set_target_machine_global_isel(machine, false)
-    jtmb    = LibLLVMM.orc_jit_target_machine_builder_create_from_target_machine(machine)
+    jtmb = LibLLVMM.orc_jit_target_machine_builder_create_from_target_machine(machine)
     builder = LLVMM::Orc::LLJITBuilder.new
     LibLLVMM.orc_lljit_builder_set_jit_target_machine_builder(builder, jtmb)
     @jit = LLVMM::Orc::LLJIT.new(builder)
   end
 
-  # Creates a JIT and yields it, disposing it when the block returns.
-  def self.new(&)
-    jit = new
+  # Creates a JIT and yields it, disposing it when the block returns. When
+  # *passes* is given, every submitted module runs that new-pass-manager pipeline.
+  def self.new(*, passes : String? = nil, &)
+    jit = new(passes: passes)
     yield jit ensure jit.dispose
   end
 
@@ -68,11 +73,33 @@ class LLVMM::JIT
     @context.new_module(name).tap { |mod| mod.target = LLVMM.default_target_triple }
   end
 
+  # Builds a module named *name* and yields a `ModuleBuilder`. Verifies and submits
+  # the module after the block returns normally. Caller or verification exceptions
+  # leave the module unsubmitted.
+  def module(name : String, &) : Nil
+    mod = new_module(name)
+    yield ModuleBuilder.new(mod, self)
+    mod.verify
+    add_module(mod)
+  end
+
+  # Parses textual LLVM IR in *source*, verifies it, and submits the resulting module.
+  # The configured pass pipeline runs before submission.
+  def add_ir(source : String) : Nil
+    buffer = LLVMM::MemoryBuffer.create_copy(source.to_slice, "jit")
+    mod = @context.parse_ir(buffer)
+    mod.target = LLVMM.default_target_triple
+    mod.verify
+    add_module(mod)
+  end
+
   # Takes ownership of *mod* and adds it to the main JITDyLib for compilation.
   # The module must have been built in this JIT's `#context` (see `#new_module`) and
   # must not be disposed, modified, or added again afterwards. The signatures of the
   # module's functions are recorded for the runtime checks performed by `#function`.
+  # When the JIT was created with *passes*, that pipeline runs before ownership transfer.
   def add_module(mod : LLVMM::Module) : Nil
+    optimize(mod)
     mod.functions.each do |func|
       fun_ty = func.function_type
       @arg_types[func.name] = fun_ty.params_types.map(&.inspect)
@@ -94,12 +121,20 @@ class LLVMM::JIT
     @jit.main_jit_dylib.link_symbols_from_path(path, @jit.global_prefix)
   end
 
+  # Defines *name* as an absolute symbol for a non-capturing Crystal *function*.
+  # Raises `ArgumentError` for a closure, whose captured state cannot be represented
+  # by an absolute function address.
+  def define(name : String, function : Proc) : Nil
+    raise ArgumentError.new("JIT host functions must be non-capturing") if function.closure?
+    define(name, Pointer(Void).new(function.pointer.address))
+  end
+
   # Defines *name* as an absolute symbol pointing at *address* in the main JITDyLib,
   # e.g. to expose a Crystal `fun` to JIT'd code.
   def define(name : String, address : Void*) : Nil
     session = LibLLVMM.orc_lljit_get_execution_session(@jit)
-    entry   = LibLLVMM.orc_execution_session_intern(session, name.check_no_null_byte)
-    pairs   = LibC.malloc(LibC::SizeT.new(sizeof(LibLLVMM::OrcCSymbolMapPair))).as(LibLLVMM::OrcCSymbolMapPairs)
+    entry = LibLLVMM.orc_execution_session_intern(session, name.check_no_null_byte)
+    pairs = LibC.malloc(LibC::SizeT.new(sizeof(LibLLVMM::OrcCSymbolMapPair))).as(LibLLVMM::OrcCSymbolMapPairs)
     pairs[0] = LibLLVMM::OrcCSymbolMapPair.new(name: entry, address: address.address.to_u64)
     unit = LibLLVMM.orc_absolute_symbols(pairs, LibC::SizeT.new(1))
     LLVMM.assert LibLLVMM.orc_jit_dylib_define(@jit.main_jit_dylib, unit)
@@ -129,11 +164,44 @@ class LLVMM::JIT
   # mappable; any other type is a compile-time error. The returned proc is only valid
   # until the JIT is disposed.
   def function(name : String, *types : *T) forall T
+    expected_args, expected_ret = signature_types(*types)
+    verify_signature!(name, expected_args, expected_ret)
+    address = @jit.lookup(name)
+    raise "JIT symbol '#{name}' resolved to a null address" if address.null?
+    {{ (
+         args = [] of String
+         T.type_vars.each_with_index do |t, i|
+           unless i == T.type_vars.size - 1
+             args << (t < Pointer.class ? "a#{i} : typeof(types[#{i}].null)" : "a#{i} : typeof(types[#{i}].allocate)")
+           end
+         end
+         last = T.type_vars.size - 1
+         ret = T.type_vars.last < Pointer.class ? "types[#{last}].null" : "types[#{last}].allocate"
+         "typeof(->(" + args.join(", ") + ") : typeof(" + ret + ") { raise \"unreachable\" }).new(address, Pointer(Void).null)"
+       ).id }}
+  end
+
+  # Disposes the underlying `Orc::LLJIT` instance and its thread-safe context.
+  # Idempotent. Invalidates `#context`, all added modules, and every proc returned
+  # by `#function`.
+  def dispose : Nil
+    return if @disposed
+    @disposed = true
+    @jit.dispose
+    @ts_ctx.dispose
+  end
+
+  def finalize
+    dispose
+  end
+
+  # :nodoc:
+  def signature_types(*types : *T) forall T
     {% if T.size == 0 %}
-      {% raise "LLVMM::JIT#function requires at least a return type" %}
+      {% raise "LLVMM::JIT function signatures require at least a return type" %}
     {% end %}
     expected_args = [] of LLVMM::Type
-    expected_ret  = @context.void_pointer
+    expected_ret = @context.void_pointer
     {% for t, i in T.type_vars %}
       {% if i == T.type_vars.size - 1 %}
         {% if t < Pointer.class %}
@@ -152,34 +220,20 @@ class LLVMM::JIT
         {% end %}
       {% end %}
     {% end %}
-    verify_signature!(name, expected_args, expected_ret)
-    address = @jit.lookup(name)
-    raise "JIT symbol '#{name}' resolved to a null address" if address.null?
-    {{ (
-         args = [] of String
-         T.type_vars.each_with_index do |t, i|
-           unless i == T.type_vars.size - 1
-             args << (t < Pointer.class ? "a#{i} : typeof(types[#{i}].null)" : "a#{i} : typeof(types[#{i}].allocate)")
-           end
-         end
-         last = T.type_vars.size - 1
-         ret  = T.type_vars.last < Pointer.class ? "types[#{last}].null" : "types[#{last}].allocate"
-         "typeof(->(" + args.join(", ") + ") : typeof(" + ret + ") { raise \"unreachable\" }).new(address, Pointer(Void).null)"
-       ).id }}
+    {expected_args, expected_ret}
   end
 
-  # Disposes the underlying `Orc::LLJIT` instance and its thread-safe context.
-  # Idempotent. Invalidates `#context`, all added modules, and every proc returned
-  # by `#function`.
-  def dispose : Nil
-    return if @disposed
-    @disposed = true
-    @jit.dispose
-    @ts_ctx.dispose
-  end
+  private def optimize(mod : LLVMM::Module) : Nil
+    passes = @passes
+    return unless passes
 
-  def finalize
-    dispose
+    machine = @target_machine ||= begin
+      triple = LLVMM.default_target_triple
+      LLVMM::Target.from_triple(triple).create_target_machine(triple, LLVMM.host_cpu_name)
+    end
+    LLVMM::PassBuilderOptions.new do |options|
+      LLVMM.run_passes(mod, passes, machine, options)
+    end
   end
 
   private def verify_signature!(name : String, expected_args : Array(LLVMM::Type), expected_ret : LLVMM::Type) : Nil

@@ -55,9 +55,9 @@
   end
 {% end %}
 
-# Supported library versions: LLVM 18+
+# Supported library versions: LLVM 19+
 {% begin %}
-  {% raise "llvmm requires LLVM 18 or later (found #{LibLLVMM::VERSION})" if compare_versions(LibLLVMM::VERSION, "18.0.0") < 0 %}
+  {% raise "llvmm requires LLVM 19 or later (found #{LibLLVMM::VERSION})" if compare_versions(LibLLVMM::VERSION, "19.0.0") < 0 %}
   lib LibLLVMM
     IS_LT_190 = {{compare_versions(LibLLVMM::VERSION, "19.0.0") < 0}}
     IS_LT_200 = {{compare_versions(LibLLVMM::VERSION, "20.0.0") < 0}}

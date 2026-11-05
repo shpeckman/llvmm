@@ -19,8 +19,8 @@ describe LLVMM::JIT do
 
   it "maps Int64, Float64, Bool, Nil, and pointers" do
     LLVMM::JIT.new do |jit|
-      mod        = jit.new_module("breadth")
-      int64_ty   = jit.context.int64
+      mod = jit.new_module("breadth")
+      int64_ty = jit.context.int64
       float64_ty = jit.context.double
 
       classify = mod.functions.add("classify", [int64_ty], jit.context.int1)
@@ -53,9 +53,9 @@ describe LLVMM::JIT do
 
   it "passes StaticArray and structs by value" do
     LLVMM::JIT.new do |jit|
-      mod      = jit.new_module("aggregates")
+      mod = jit.new_module("aggregates")
       int32_ty = jit.context.int32
-      arr_ty   = int32_ty.array(4)
+      arr_ty = int32_ty.array(4)
       point_ty = jit.context.struct([int32_ty, int32_ty])
 
       sum_arr = mod.functions.add("sum_arr", [arr_ty], int32_ty)
@@ -105,9 +105,9 @@ describe LLVMM::JIT do
 
   it "calls process symbols from JIT'd code" do
     LLVMM::JIT.new do |jit|
-      mod       = jit.new_module("proc_syms")
-      int32_ty  = jit.context.int32
-      abs_fn    = mod.functions.add("abs", [int32_ty], int32_ty)
+      mod = jit.new_module("proc_syms")
+      int32_ty = jit.context.int32
+      abs_fn = mod.functions.add("abs", [int32_ty], int32_ty)
       caller_fn = mod.functions.add("call_abs", [int32_ty], int32_ty)
       caller_fn.basic_blocks.append("entry") do |builder|
         result = builder.call(abs_fn.function_type, abs_fn, [caller_fn.params[0]], "absval")
@@ -122,9 +122,9 @@ describe LLVMM::JIT do
 
   it "calls registered absolute symbols from JIT'd code" do
     LLVMM::JIT.new do |jit|
-      mod       = jit.new_module("abs_syms")
-      int32_ty  = jit.context.int32
-      helper    = mod.functions.add("llvmm_spec_double_it", [int32_ty], int32_ty)
+      mod = jit.new_module("abs_syms")
+      int32_ty = jit.context.int32
+      helper = mod.functions.add("llvmm_spec_double_it", [int32_ty], int32_ty)
       caller_fn = mod.functions.add("via_helper", [int32_ty], int32_ty)
       caller_fn.basic_blocks.append("entry") do |builder|
         result = builder.call(helper.function_type, helper, [caller_fn.params[0]], "doubled")
@@ -138,12 +138,109 @@ describe LLVMM::JIT do
     end
   end
 
+  it "builds and calls functions with the module DSL" do
+    LLVMM::JIT.new do |jit|
+      jit.module("dsl") do |mod|
+        mod.function("sum_point", Point, Int32) do |func, builder|
+          x = builder.extract_value(func.params[0], 0)
+          y = builder.extract_value(func.params[0], 1)
+          builder.ret(builder.add(x, y))
+        end
+      end
+
+      jit.function("sum_point", Point, Int32).call(Point.new(19, 23)).should eq(42)
+    end
+  end
+
+  it "does not submit modules that fail verification" do
+    LLVMM::JIT.new do |jit|
+      expect_raises(Exception, "Module validation failed") do
+        jit.module("invalid") do |mod|
+          mod.function("broken", Int32) do |func, builder|
+          end
+        end
+      end
+
+      expect_raises(Exception, "no function named 'broken'") do
+        jit.function("broken", Int32)
+      end
+    end
+  end
+
+  it "runs configured pass pipelines before submission" do
+    LLVMM::JIT.new(passes: "default<O2>") do |jit|
+      mod = jit.new_module("optimized")
+      int32 = jit.context.int32
+      func = mod.functions.add("identity", [int32], int32)
+      product = uninitialized LLVMM::Value
+
+      func.basic_blocks.append("entry") do |builder|
+        product = builder.mul(func.params[0], int32.const_int(0))
+        builder.ret(builder.add(func.params[0], product))
+      end
+
+      unoptimized = mod.to_s
+      jit.add_module(mod)
+      mod.to_s.should_not eq(unoptimized)
+      jit.function("identity", Int32, Int32).call(42).should eq(42)
+    end
+  end
+
+  it "raises on invalid configured pass pipelines" do
+    LLVMM::JIT.new(passes: "not-a-real-pass") do |jit|
+      expect_raises(Exception) do
+        jit.module("bad_pipeline") do |mod|
+          mod.function("answer", Int32) do |func, builder|
+            builder.ret(jit.context.int32.const_int(42))
+          end
+        end
+      end
+    end
+  end
+
+  it "declares and defines typed host functions" do
+    LLVMM::JIT.new do |jit|
+      jit.module("typed_host") do |mod|
+        helper = mod.function("llvmm_spec_double_it", Int32, Int32)
+        mod.function("via_typed_helper", Int32, Int32) do |func, builder|
+          result = builder.call(helper.function_type, helper, [func.params[0]])
+          builder.ret(result)
+        end
+      end
+      jit.define("llvmm_spec_double_it", ->llvmm_spec_double_it(Int32))
+
+      jit.function("via_typed_helper", Int32, Int32).call(21).should eq(42)
+
+      factor = 2
+      closure = ->(x : Int32) { x * factor }
+      expect_raises(ArgumentError, "must be non-capturing") do
+        jit.define("closure", closure)
+      end
+    end
+  end
+
+  it "parses, verifies, and calls textual IR" do
+    LLVMM::JIT.new do |jit|
+      jit.add_ir(<<-IR)
+        define i32 @answer() {
+        entry:
+          ret i32 42
+        }
+        IR
+
+      jit.function("answer", Int32).call.should eq(42)
+      expect_raises(Exception) do
+        jit.add_ir("this is not LLVM IR")
+      end
+    end
+  end
+
   it "survives many create/add/call/dispose cycles" do
     25.times do |i|
       LLVMM::JIT.new do |jit|
-        mod      = jit.new_module("cycle_#{i}")
+        mod = jit.new_module("cycle_#{i}")
         int32_ty = jit.context.int32
-        fn       = mod.functions.add("roundtrip", [int32_ty], int32_ty)
+        fn = mod.functions.add("roundtrip", [int32_ty], int32_ty)
         fn.basic_blocks.append("entry") do |builder|
           builder.ret(builder.add(fn.params[0], int32_ty.const_int(1)))
         end

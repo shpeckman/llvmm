@@ -5,13 +5,13 @@ LLVM bindings for [Crystal](https://crystal-lang.org), focused on JIT compilatio
 
 Crystal's standard library ships an `LLVM` module, but it is only maintained as far as
 the Crystal compiler itself needs it. **llvmm** is an independent shard that tracks the
-LLVM C API across LLVM 18–23, with first-class support for the ORCv2 JIT stack: build
+LLVM C API across LLVM 19–23, with first-class support for the ORCv2 JIT stack: build
 IR, hand it to an LLJIT instance, and call the compiled code like an ordinary Crystal proc.
 
 ## Requirements
 
 - Crystal `>= 1.21.0`
-- LLVM 18–23 development files (`llvm-config` must be discoverable)
+- LLVM 19–23 development files (`llvm-config` must be discoverable)
 
 On Fedora: `sudo dnf install llvm-devel`
 On Debian/Ubuntu: `sudo apt install llvm-dev` (or a versioned package such as `llvm-21-dev`)
@@ -52,12 +52,11 @@ LLVM_CONFIG=llvm-config-21 crystal build my_app.cr
 require "llvmm"
 
 LLVMM::JIT.new do |jit|
-  mod = jit.new_module("example")
-  add = mod.functions.add("add", [jit.context.int32, jit.context.int32], jit.context.int32)
-  add.basic_blocks.append("entry") do |builder|
-    builder.ret(builder.add(add.params[0], add.params[1]))
+  jit.module("example") do |mod|
+    mod.function("add", Int32, Int32, Int32) do |func, builder|
+      builder.ret(builder.add(func.params[0], func.params[1]))
+    end
   end
-  jit.add_module(mod)
 
   jit.function("add", Int32, Int32, Int32).call(19, 23) # => 42
 end
@@ -77,6 +76,12 @@ return types map as follows:
 | structs (by value)                  | `{ field0, field1, ... }`|
 | `Nil`                               | `void` (return only)     |
 
+### Optimization and textual IR
+
+Pass `passes: "default<O2>"` to `LLVMM::JIT.new` to optimize every module before
+submission. `jit.add_ir(source)` parses, verifies, optimizes, and submits textual
+LLVM IR using the same JIT context and typed function lookup.
+
 ### Linking external symbols
 
 JIT'd code can call into the host process or into shared libraries:
@@ -89,8 +94,11 @@ fun my_helper(x : Int32) : Int32
   x * 2
 end
 
-jit.define("my_helper", Pointer(Void).new(->my_helper(Int32).pointer.address))
+jit.define("my_helper", ->my_helper(Int32))
 ```
+
+The `Proc` overload of `jit.define` accepts non-capturing functions and rejects
+closures. The existing `Void*` overload remains available for raw addresses.
 
 ## Beyond the JIT facade
 
@@ -115,7 +123,7 @@ make api-diff       # diff bindings against the llvm-c headers of the newest llv
 make docs           # generate API documentation into docs/
 ```
 
-CI runs the spec suite against LLVM 18, 19, 20, 21, 22, and 23 on every push and
+CI runs the spec suite against LLVM 19, 20, 21, 22, and 23 on every push and
 pull request.
 
 ## License

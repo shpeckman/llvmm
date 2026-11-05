@@ -1234,7 +1234,7 @@ describe "C API surface on every supported version" do
 
   it "reports the LLVM version and host CPU features" do
     major = LLVMM.version.split('.').first.to_i
-    major.should be >= 18
+    major.should be >= 19
 
     LLVMM.host_cpu_features.should_not be_empty
     LLVMM.host_cpu_features.should contain("+")

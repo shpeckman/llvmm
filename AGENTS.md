@@ -10,13 +10,14 @@ with a focus on JIT (ORCv2) compilation.
 - `src/llvmm/` — high-level wrappers: `context.cr`, `module.cr`, `builder.cr`,
   `type.cr`, `value.cr`, `function.cr`, collection types, `target*.cr`, `di_builder.cr`
 - `src/llvmm/jit.cr` — `LLVMM::JIT`, the high-level JIT facade
+- `src/llvmm/jit/module_builder.cr` — typed module/function construction DSL
 - `src/llvmm/orc/` — raw ORCv2 bindings (`LLJIT`, `ExecutionSession`, `JITDyLib`, …)
 - `src/llvmm/lib_llvm.cr` + `src/llvmm/lib_llvm/` — `lib LibLLVMM` FFI declarations,
   `llvm-config` resolution, version gates (`IS_LT_190` … `IS_LT_230`)
 - `src/llvmm/ext/` — `find-llvm-config.sh` and `llvm-versions.txt` (supported versions)
 - `spec/` — spec suite; `jit_api_spec.cr` and `toy_compiler_spec.cr` exercise the JIT
 - `scripts/api_diff.cr` — diffs bindings against the llvm-c headers of an llvmorg tag
-- `.github/workflows/` — CI spec matrix (LLVM 18–23) and the weekly API diff
+- `.github/workflows/` — CI spec matrix (LLVM 19–23) and the weekly API diff
 
 ## Commands
 
